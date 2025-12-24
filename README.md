@@ -4,7 +4,7 @@
 [![LightGBM](https://img.shields.io/badge/LightGBM-ML-green.svg)](https://lightgbm.readthedocs.io/)
 [![SHAP](https://img.shields.io/badge/SHAP-Explainable_AI-orange.svg)](https://shap.readthedocs.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-REST_API-009688.svg)](https://fastapi.tiangolo.com/)
-[![Streamlit]([https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B.svg)](https://review-intelligence-system.streamlit.app/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B.svg)](https://review-intelligence-system.streamlit.app/)
 
 A production-grade **MLOps platform** for predicting product sales volume and identifying negative review risks with **SHAP-based explainability**. Built with LightGBM for high-performance inference and FastAPI for real-time serving.
 
