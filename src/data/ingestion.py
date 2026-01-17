@@ -36,13 +36,28 @@ LIST_COLUMNS = [
     'variant_name'
 ]
 
-# Core columns that must exist for pipeline to work
+# Core columns that must exist for pipeline to work (original format)
 REQUIRED_COLUMNS = [
     'product_id',
     'count_sold', 
     'price',
     'review_rating',
     'message'
+]
+
+# Alternative column mapping for simplified dataset format
+# Maps from: simplified_column -> standard_column
+COLUMN_MAPPING = {
+    'text': 'message',
+    'rating': 'review_rating',
+    'sold': 'count_sold',
+}
+
+# Minimum required columns for simplified format
+SIMPLIFIED_REQUIRED_COLUMNS = [
+    'product_id',
+    'rating',  # or review_rating
+    'text',    # or message
 ]
 
 
@@ -99,6 +114,40 @@ def _parse_list_columns(df: pd.DataFrame, columns: List[str] = None) -> pd.DataF
     return df
 
 
+def _detect_and_normalize_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
+    """
+    Detect dataset format and normalize column names.
+    
+    Returns:
+        Tuple of (normalized_df, is_simplified_format)
+    """
+    df = df.copy()
+    is_simplified = False
+    
+    # Check if this is simplified format (has 'text' and 'rating' instead of 'message' and 'review_rating')
+    if 'text' in df.columns and 'message' not in df.columns:
+        is_simplified = True
+        
+    # Apply column mapping
+    for old_col, new_col in COLUMN_MAPPING.items():
+        if old_col in df.columns and new_col not in df.columns:
+            df = df.rename(columns={old_col: new_col})
+            logger.info(f"Renamed column '{old_col}' -> '{new_col}'")
+    
+    # Add missing columns with default values for simplified format
+    if is_simplified:
+        if 'price' not in df.columns:
+            # Try to extract from product_url or set default
+            df['price'] = 0  # Default price, will be handled in preprocessing
+            logger.info("Added default 'price' column (not present in simplified format)")
+        
+        if 'count_sold' not in df.columns and 'sold' not in df.columns:
+            df['count_sold'] = 0
+            logger.info("Added default 'count_sold' column")
+    
+    return df, is_simplified
+
+
 def load_tokopedia_data(
     filepath: Union[str, Path],
     parse_lists: bool = True,
@@ -109,8 +158,9 @@ def load_tokopedia_data(
     """
     Load the Tokopedia products with reviews dataset.
     
-    This loads the data at PRODUCT LEVEL (one row per product).
-    Review columns will contain lists of reviews.
+    Supports two formats:
+    1. Original format: Product-level data with nested review lists
+    2. Simplified format: Review-level data with columns like 'text', 'rating', 'sold'
     
     Args:
         filepath: Path to the CSV file
@@ -120,7 +170,7 @@ def load_tokopedia_data(
         validate: Whether to run basic validation checks
         
     Returns:
-        DataFrame with product-level data
+        DataFrame with normalized column names
         
     Raises:
         ValueError: If required columns are missing
@@ -143,14 +193,22 @@ def load_tokopedia_data(
     
     logger.info(f"Loaded {len(df):,} rows, {len(df.columns)} columns")
     
+    # Detect format and normalize columns
+    df, is_simplified = _detect_and_normalize_columns(df)
+    
+    if is_simplified:
+        logger.info("Detected SIMPLIFIED dataset format (review-level data)")
+    else:
+        logger.info("Detected ORIGINAL dataset format (product-level data)")
+    
     # Validate required columns
     if validate:
         missing_cols = set(REQUIRED_COLUMNS) - set(df.columns)
         if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+            logger.warning(f"Some standard columns missing: {missing_cols}. Continuing with available data.")
     
-    # Parse list columns
-    if parse_lists:
+    # Parse list columns (only for original format)
+    if parse_lists and not is_simplified:
         cols_to_parse = [c for c in LIST_COLUMNS if c in df.columns]
         df = _parse_list_columns(df, cols_to_parse)
     
@@ -195,6 +253,8 @@ def explode_reviews(df: pd.DataFrame) -> pd.DataFrame:
     (review_rating, message, etc.) and "explodes" it so each row
     represents a single review.
     
+    If data is already at review-level (simplified format), returns as-is.
+    
     Args:
         df: Product-level DataFrame with parsed list columns
         
@@ -210,6 +270,14 @@ def explode_reviews(df: pd.DataFrame) -> pd.DataFrame:
             product_id=123, review_rating=3, message='Bad'
     """
     df = df.copy()
+    
+    # Check if data is already at review-level (simplified format)
+    # by checking if review_rating column contains scalar values, not lists
+    if 'review_rating' in df.columns:
+        sample_value = df['review_rating'].dropna().iloc[0] if len(df['review_rating'].dropna()) > 0 else None
+        if sample_value is not None and not isinstance(sample_value, list):
+            logger.info("Data is already at review-level (simplified format). Skipping explosion.")
+            return df
     
     # Columns to explode (must be lists)
     explode_cols = [c for c in LIST_COLUMNS if c in df.columns]

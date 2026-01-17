@@ -27,7 +27,9 @@ This system addresses both challenges with interpretable ML models that provide 
 | ---------------------------- | ----------------------------------------------------------- |
 | 🔮 **Sales Prediction**      | Predict expected sales volume with confidence intervals     |
 | ⚠️ **Risk Assessment**       | Identify products with high probability of negative reviews |
+| �️ **AI Recommender**        | Content-based product recommendations with explanations     |
 | 📊 **SHAP Explainability**   | Transparent explanations for every prediction               |
+| 🧠 **Explainable Recommendations** | Understand WHY each product is recommended           |
 | ⚡ **Real-time API**         | FastAPI endpoints with <50ms inference time                 |
 | 📈 **Interactive Dashboard** | Streamlit app for visualization and demos                   |
 | 🔄 **Drift Detection**       | Monitor data and model drift in production                  |

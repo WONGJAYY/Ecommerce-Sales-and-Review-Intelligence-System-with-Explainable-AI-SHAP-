@@ -286,10 +286,10 @@ class FeatureEngineer:
         
         for col, encoder in self._label_encoders.items():
             if col in df.columns:
-                # Handle unseen categories
-                df[f'{col}_encoded'] = df[col].fillna('Unknown').astype(str).apply(
-                    lambda x: encoder.transform([x])[0] if x in encoder.classes_ else -1
-                )
+                # Handle unseen categories efficiently using a mapping dictionary
+                class_to_idx = {c: i for i, c in enumerate(encoder.classes_)}
+                col_values = df[col].fillna('Unknown').astype(str)
+                df[f'{col}_encoded'] = col_values.map(class_to_idx).fillna(-1).astype(int)
         
         return df
     
