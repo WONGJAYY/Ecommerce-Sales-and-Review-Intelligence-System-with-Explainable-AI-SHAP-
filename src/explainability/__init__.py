@@ -1,11 +1,13 @@
 """
 Explainability Module
 
-SHAP-based explainability engine providing transparent,
+SHAP and LIME-based explainability engine providing transparent,
 actionable explanations for every prediction.
 
 Main Classes:
-    SHAPExplainer: Core SHAP computation
+    SHAPExplainer: Core SHAP computation (TreeSHAP, KernelSHAP)
+    LIMEExplainer: Local Interpretable Model-agnostic Explanations
+    CombinedExplainer: Cross-validated SHAP + LIME explanations
     ExplanationFormatter: Format for API/reports
     ExplanationVisualizer: Generate plots
 """
@@ -16,6 +18,14 @@ from src.explainability.shap_explainer import (
     TreeSHAPEngine,
     compute_shap_values,
     get_feature_importance
+)
+
+from src.explainability.lime_explainer import (
+    LIMEExplainer,
+    LIMEExplanation,
+    CombinedExplainer,
+    compute_lime_weights,
+    get_lime_feature_importance
 )
 
 from src.explainability.explanations import (
@@ -40,6 +50,13 @@ __all__ = [
     'TreeSHAPEngine',
     'compute_shap_values',
     'get_feature_importance',
+    
+    # LIME Core
+    'LIMEExplainer',
+    'LIMEExplanation',
+    'CombinedExplainer',
+    'compute_lime_weights',
+    'get_lime_feature_importance',
     
     # Formatting
     'Explanation',

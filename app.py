@@ -1,11 +1,12 @@
-"""
-Review Intelligence System - Demo Dashboard
+"""Explainable AI E-Commerce Recommender System - Demo Dashboard
 
 Interactive Streamlit app showcasing:
-- Sales Volume Prediction
-- Review Risk Assessment
+- AI-Powered Product Recommendations
 - SHAP Explainability
 - Dataset Insights
+
+Note: Sales Predictor and Risk Analyzer features are commented out.
+Uncomment them if needed.
 """
 
 import streamlit as st
@@ -60,32 +61,35 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Load models and data
-@st.cache_resource
-def load_models():
-    """Load trained models."""
-    try:
-        from src.models.sales_predictor import SalesPredictor
-        from src.models.review_risk_predictor import ReviewRiskPredictor
-        
-        sales_model = SalesPredictor.load(Path("models/sales_predictor/model.pkl"))
-        risk_model = ReviewRiskPredictor.load(Path("models/review_risk_predictor/model.pkl"))
-        
-        return sales_model, risk_model
-    except Exception as e:
-        st.error(f"Failed to load models: {e}")
-        return None, None
+# ========== COMMENTED OUT: Sales & Risk Models ==========
+# Uncomment this section if you need Sales Predictor or Risk Analyzer
+#
+# @st.cache_resource
+# def load_models():
+#     """Load trained models."""
+#     try:
+#         from src.models.sales_predictor import SalesPredictor
+#         from src.models.review_risk_predictor import ReviewRiskPredictor
+#         
+#         sales_model = SalesPredictor.load(Path("models/sales_predictor/model.pkl"))
+#         risk_model = ReviewRiskPredictor.load(Path("models/review_risk_predictor/model.pkl"))
+#         
+#         return sales_model, risk_model
+#     except Exception as e:
+#         st.error(f"Failed to load models: {e}")
+#         return None, None
+# ========== END COMMENTED SECTION ==========
 
 
 @st.cache_data
-def load_sample_data(nrows=500):
+def load_sample_data(nrows=None):
     """Load sample data for visualization."""
     try:
         from src.data.ingestion import load_tokopedia_data, explode_reviews
         from src.data.preprocessing import DataPreprocessor
         
-        # df = load_tokopedia_data("tokopedia_products_with_review.csv", nrows=nrows)
-        df = load_tokopedia_data("converted_dataset.csv", nrows=nrows)
+        df = load_tokopedia_data("tokopedia_products_with_review.csv", nrows=nrows)
+        # df = load_tokopedia_data("converted_dataset.csv", nrows=nrows)
 
         reviews = explode_reviews(df)
         
@@ -124,47 +128,51 @@ def load_recommender():
         return None
 
 
-def compute_features_for_prediction(features_dict, model_type='risk'):
-    """Compute derived features for prediction."""
-    price = features_dict.get('price', 0)
-    stock = features_dict.get('stock', 0)
-    discounted_price = features_dict.get('discounted_price', price)
-    gold_merchant = features_dict.get('gold_merchant', False)
-    is_official = features_dict.get('is_official', False)
-    message_length = features_dict.get('message_length', 0)
-    word_count = features_dict.get('word_count', 0)
-    rating_average = features_dict.get('rating_average', 4.5)
-    
-    computed = {
-        'price_log': np.log1p(price) if price > 0 else 0,
-        'stock_log': np.log1p(stock) if stock > 0 else 0,
-        'has_stock': 1 if stock > 0 else 0,
-        'low_stock': 1 if stock < 10 else 0,
-        'is_preorder': 0,
-        'shop_tier': int(is_official) * 2 + int(gold_merchant),
-        'uses_topads': 0,
-        'discount_pct': max(0, (price - discounted_price) / price) if price > 0 else 0,
-        'has_discount': 1 if discounted_price < price else 0,
-        'category_encoded': hash(features_dict.get('category', 'Unknown')) % 100,
-        'shop_location_encoded': hash(features_dict.get('shop_location', 'Unknown')) % 50,
-        'rating_average': rating_average,
-        'message_length': message_length,
-        'word_count': word_count,
-        'has_response': 0,
-        'review_hour': 12,
-        'review_dayofweek': 3,
-        'is_weekend': 0
-    }
-    
-    return computed
+# ========== COMMENTED OUT: Feature computation for Sales/Risk ==========
+# Uncomment this section if you need Sales Predictor or Risk Analyzer
+#
+# def compute_features_for_prediction(features_dict, model_type='risk'):
+#     """Compute derived features for prediction."""
+#     price = features_dict.get('price', 0)
+#     stock = features_dict.get('stock', 0)
+#     discounted_price = features_dict.get('discounted_price', price)
+#     gold_merchant = features_dict.get('gold_merchant', False)
+#     is_official = features_dict.get('is_official', False)
+#     message_length = features_dict.get('message_length', 0)
+#     word_count = features_dict.get('word_count', 0)
+#     rating_average = features_dict.get('rating_average', 4.5)
+#     
+#     computed = {
+#         'price_log': np.log1p(price) if price > 0 else 0,
+#         'stock_log': np.log1p(stock) if stock > 0 else 0,
+#         'has_stock': 1 if stock > 0 else 0,
+#         'low_stock': 1 if stock < 10 else 0,
+#         'is_preorder': 0,
+#         'shop_tier': int(is_official) * 2 + int(gold_merchant),
+#         'uses_topads': 0,
+#         'discount_pct': max(0, (price - discounted_price) / price) if price > 0 else 0,
+#         'has_discount': 1 if discounted_price < price else 0,
+#         'category_encoded': hash(features_dict.get('category', 'Unknown')) % 100,
+#         'shop_location_encoded': hash(features_dict.get('shop_location', 'Unknown')) % 50,
+#         'rating_average': rating_average,
+#         'message_length': message_length,
+#         'word_count': word_count,
+#         'has_response': 0,
+#         'review_hour': 12,
+#         'review_dayofweek': 3,
+#         'is_weekend': 0
+#     }
+#     
+#     return computed
+# ========== END COMMENTED SECTION ==========
 
 
 def render_header():
     """Render app header."""
-    st.markdown('<h1 class="main-header">🧠 E-Commerce Intelligence System</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🧠 Explainable AI E-Commerce Recommender System</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p style="text-align: center; color: #666; margin-bottom: 2rem;">'
-        'ML-Powered Sales Prediction, Review Risk Assessment & Explainable AI Recommendations'
+        'AI-Powered Product Recommendations with Explainable AI (SHAP)'
         '</p>',
         unsafe_allow_html=True
     )
@@ -178,7 +186,8 @@ def render_sidebar():
         
         page = st.radio(
             "Select Page",
-            ["🏠 Overview", "📊 Sales Predictor", "⚠️ Risk Analyzer", "�️ Recommender", "📈 Analytics"],
+            ["🏠 Overview", "🛍️ Recommender", "📈 Analytics"],
+            # Commented out: "📊 Sales Predictor", "⚠️ Risk Analyzer"
             label_visibility="collapsed"
         )
         
@@ -186,14 +195,14 @@ def render_sidebar():
         
         st.markdown("### About")
         st.info(
-            "This system uses **LightGBM** models with **SHAP** explainability "
-            "to predict sales, assess risks, and recommend products with explanations."
+            "This system uses **Content-Based Filtering** with **SHAP** explainability "
+            "to recommend products and explain WHY each product is suggested."
         )
         
-        st.markdown("### Model Performance")
+        st.markdown("### System Status")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Risk AUC", "0.84", delta="✓")
+            st.metric("Recommender", "Active", delta="✓")
         with col2:
             st.metric("API Status", "Online", delta="✓")
         
@@ -206,11 +215,20 @@ def render_overview():
     
     # Load actual data count
     df, reviews = load_sample_data(nrows=None)
-    review_count = len(reviews) if reviews is not None else 1597
+    product_count = len(df) if df is not None else 0
+    review_count = len(reviews) if reviews is not None else 0
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h2>{product_count:,}</h2>
+            <p>Products</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
         st.markdown(f"""
         <div class="metric-card">
             <h2>{review_count:,}</h2>
@@ -218,19 +236,11 @@ def render_overview():
         </div>
         """, unsafe_allow_html=True)
     
-    with col2:
-        st.markdown("""
-        <div class="metric-card">
-            <h2>6</h2>
-            <p>Modules Built</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
     with col3:
         st.markdown("""
         <div class="metric-card">
-            <h2>0.79</h2>
-            <p>Risk Model AUC</p>
+            <h2>SHAP & LIME</h2>
+            <p>Explainability</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -254,210 +264,383 @@ def render_overview():
         | Layer | Components |
         |-------|------------|
         | **Data** | Ingestion, Validation, Preprocessing |
-        | **Features** | Engineering, Store, Definitions |
-        | **Models** | Sales Predictor, Risk Predictor, **Recommender** |
-        | **Explainability** | SHAP Explainer, Recommendation Explanations |
-        | **Serving** | FastAPI, Inference Engine |
-        | **Monitoring** | Data Drift, Model Drift, Metrics |
+        | **Features** | Feature Engineering, Feature Store |
+        | **Models** | Content-Based Filtering Recommender |
+        | **Explainability** | SHAP (Shapley Values), LIME (Local Explanations) |
+        | **Serving** | FastAPI, Streamlit Dashboard |
         """)
     
     with col2:
         st.markdown("### Tech Stack")
         st.markdown("""
         - 🐍 Python 3.10+
-        - 🌿 LightGBM
-        - 📊 SHAP
+        - 📊 SHAP (SHapley Additive exPlanations)
+        - 🍋 LIME (Local Interpretable Model-agnostic Explanations)
         - 🛍️ Content-Based Filtering
+        - 📈 Scikit-learn
         - ⚡ FastAPI
         - 🎨 Streamlit
         """)
 
 
-def render_sales_predictor():
-    """Render sales prediction page."""
-    st.header("📊 Sales Volume Predictor")
-    st.markdown("Predict expected sales for a product based on its attributes.")
-    
-    sales_model, _ = load_models()
-    
-    if sales_model is None:
-        st.error("Sales model not loaded. Please train models first.")
-        return
-    
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.subheader("Product Details")
-        
-        price = st.number_input("Price (MYR)", min_value=10, value=150, step=10)
-        stock = st.number_input("Stock", min_value=0, value=100, step=10)
-        rating = st.slider("Average Rating", 1.0, 5.0, 4.5, 0.1)
-        
-        gold_merchant = st.checkbox("Gold Merchant", value=True)
-        is_official = st.checkbox("Official Store", value=False)
-        
-        category = st.selectbox(
-            "Category",
-            ["Electronics", "Fashion", "Home & Living", "Food & Beverage", "Other"]
-        )
-        
-        predict_button = st.button("🔮 Predict Sales", type="primary", use_container_width=True)
-    
-    with col2:
-        if predict_button:
-            # Prepare features
-            features = compute_features_for_prediction({
-                'price': price,
-                'stock': stock,
-                'rating_average': rating,
-                'gold_merchant': gold_merchant,
-                'is_official': is_official,
-                'category': category
-            }, 'sales')
-            
-            # Get model features
-            required = sales_model.feature_names
-            X = pd.DataFrame([{f: features.get(f, 0) for f in required}])
-            
-            # Predict
-            prediction = sales_model.predict(X)[0]
-            
-            st.subheader("Prediction Results")
-            
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.metric(
-                    "Predicted Sales",
-                    f"{prediction:,.0f} units",
-                    delta=f"±{prediction * 0.3:,.0f}"
-                )
-            with col_b:
-                # Revenue estimate
-                revenue = prediction * price
-                st.metric("Est. Revenue", f"RM {revenue:,.2f}")
-            
-            # Feature importance
-            st.subheader("Key Drivers")
-            importance = sales_model.get_feature_importance().head(8)
-            
-            fig = px.bar(
-                importance,
-                x='importance',
-                y='feature',
-                orientation='h',
-                color='importance',
-                color_continuous_scale='Viridis'
-            )
-            fig.update_layout(
-                yaxis={'categoryorder': 'total ascending'},
-                showlegend=False,
-                height=300
-            )
-            st.plotly_chart(fig, use_container_width=True)
+# ========== COMMENTED OUT: Sales Predictor Page ==========
+# Uncomment this section if you need Sales Predictor functionality
+#
+# def render_sales_predictor():
+#     """Render sales prediction page."""
+#     st.header("📊 Sales Volume Predictor")
+#     st.markdown("Predict expected sales for a product based on its attributes.")
+#     
+#     sales_model, _ = load_models()
+#     
+#     if sales_model is None:
+#         st.error("Sales model not loaded. Please train models first.")
+#         return
+#     
+#     col1, col2 = st.columns([1, 2])
+#     
+#     with col1:
+#         st.subheader("Product Details")
+#         
+#         price = st.number_input("Price (MYR)", min_value=10, value=150, step=10)
+#         stock = st.number_input("Stock", min_value=0, value=100, step=10)
+#         rating = st.slider("Average Rating", 1.0, 5.0, 4.5, 0.1)
+#         
+#         gold_merchant = st.checkbox("Gold Merchant", value=True)
+#         is_official = st.checkbox("Official Store", value=False)
+#         
+#         category = st.selectbox(
+#             "Category",
+#             ["Electronics", "Fashion", "Home & Living", "Food & Beverage", "Other"]
+#         )
+#         
+#         predict_button = st.button("🔮 Predict Sales", type="primary", use_container_width=True)
+#     
+#     with col2:
+#         if predict_button:
+#             # Prepare features
+#             features = compute_features_for_prediction({
+#                 'price': price,
+#                 'stock': stock,
+#                 'rating_average': rating,
+#                 'gold_merchant': gold_merchant,
+#                 'is_official': is_official,
+#                 'category': category
+#             }, 'sales')
+#             
+#             # Get model features
+#             required = sales_model.feature_names
+#             X = pd.DataFrame([{f: features.get(f, 0) for f in required}])
+#             
+#             # Predict
+#             prediction = sales_model.predict(X)[0]
+#             
+#             st.subheader("Prediction Results")
+#             
+#             col_a, col_b = st.columns(2)
+#             with col_a:
+#                 st.metric(
+#                     "Predicted Sales",
+#                     f"{prediction:,.0f} units",
+#                     delta=f"±{prediction * 0.3:,.0f}"
+#                 )
+#             with col_b:
+#                 # Revenue estimate
+#                 revenue = prediction * price
+#                 st.metric("Est. Revenue", f"RM {revenue:,.2f}")
+#             
+#             # Feature importance
+#             st.subheader("Key Drivers")
+#             importance = sales_model.get_feature_importance().head(8)
+#             
+#             fig = px.bar(
+#                 importance,
+#                 x='importance',
+#                 y='feature',
+#                 orientation='h',
+#                 color='importance',
+#                 color_continuous_scale='Viridis'
+#             )
+#             fig.update_layout(
+#                 yaxis={'categoryorder': 'total ascending'},
+#                 showlegend=False,
+#                 height=300
+#             )
+#             st.plotly_chart(fig, use_container_width=True)
+# ========== END COMMENTED SECTION ==========
 
 
-def render_risk_analyzer():
-    """Render risk analysis page."""
-    st.header("⚠️ Review Risk Analyzer")
-    st.markdown("Assess the probability of receiving a negative review.")
-    
-    _, risk_model = load_models()
-    
-    if risk_model is None:
-        st.error("Risk model not loaded. Please train models first.")
-        return
-    
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.subheader("Review Details")
-        
-        price = st.number_input("Product Price (MYR)", min_value=10, value=150, step=10)
-        message_length = st.number_input("Review Length (chars)", min_value=0, value=50)
-        word_count = st.number_input("Word Count", min_value=0, value=10)
-        
-        gold_merchant = st.checkbox("Gold Merchant", value=False, key="risk_gold")
-        is_official = st.checkbox("Official Store", value=False, key="risk_official")
-        
-        analyze_button = st.button("🔍 Analyze Risk", type="primary", use_container_width=True)
-    
-    with col2:
-        if analyze_button:
-            # Prepare features
-            features = compute_features_for_prediction({
-                'price': price,
-                'message_length': message_length,
-                'word_count': word_count,
-                'gold_merchant': gold_merchant,
-                'is_official': is_official
-            }, 'risk')
-            
-            # Get model features
-            required = risk_model.feature_names
-            X = pd.DataFrame([{f: features.get(f, 0) for f in required}])
-            
-            # Predict
-            probability = risk_model.predict_proba(X)[0]
-            
-            # Determine risk level
-            if probability < 0.2:
-                risk_level = "LOW"
-                color = "#10B981"
-            elif probability < 0.5:
-                risk_level = "MEDIUM"
-                color = "#F59E0B"
-            elif probability < 0.8:
-                risk_level = "HIGH"
-                color = "#EF4444"
-            else:
-                risk_level = "CRITICAL"
-                color = "#DC2626"
-            
-            st.subheader("Risk Assessment")
-            
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.metric("Risk Probability", f"{probability * 100:.1f}%")
-            with col_b:
-                st.markdown(f"**Risk Level:** <span style='color: {color}; font-size: 1.5rem;'>{risk_level}</span>", unsafe_allow_html=True)
-            
-            # Risk gauge
-            fig = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=probability * 100,
-                title={'text': "Risk Score"},
-                gauge={
-                    'axis': {'range': [0, 100]},
-                    'bar': {'color': color},
-                    'steps': [
-                        {'range': [0, 20], 'color': "#D1FAE5"},
-                        {'range': [20, 50], 'color': "#FEF3C7"},
-                        {'range': [50, 80], 'color': "#FEE2E2"},
-                        {'range': [80, 100], 'color': "#FECACA"}
-                    ]
-                }
-            ))
-            fig.update_layout(height=250)
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Feature importance
-            st.subheader("Risk Factors")
-            importance = risk_model.get_feature_importance().head(8)
-            
-            fig = px.bar(
-                importance,
-                x='importance',
-                y='feature',
-                orientation='h',
-                color='importance',
-                color_continuous_scale='Reds'
-            )
-            fig.update_layout(
-                yaxis={'categoryorder': 'total ascending'},
-                showlegend=False,
-                height=300
-            )
-            st.plotly_chart(fig, use_container_width=True)
+# ========== COMMENTED OUT: Risk Analyzer Page ==========
+# Uncomment this section if you need Risk Analyzer functionality
+#
+# def render_risk_analyzer():
+#     """Render risk analysis page."""
+#     st.header("⚠️ Review Risk Analyzer")
+#     st.markdown("Assess the probability of receiving a negative review with **SHAP & LIME explanations**.")
+#     
+#     _, risk_model = load_models()
+#     
+#     if risk_model is None:
+#         st.error("Risk model not loaded. Please train models first.")
+#         return
+#     
+#     col1, col2 = st.columns([1, 2])
+#     
+#     with col1:
+#         st.subheader("Review Details")
+#         
+#         price = st.number_input("Product Price (MYR)", min_value=10, value=150, step=10)
+#         message_length = st.number_input("Review Length (chars)", min_value=0, value=50)
+#         word_count = st.number_input("Word Count", min_value=0, value=10)
+#         
+#         gold_merchant = st.checkbox("Gold Merchant", value=False, key="risk_gold")
+#         is_official = st.checkbox("Official Store", value=False, key="risk_official")
+#         
+#         # Explainability method selection
+#         st.divider()
+#         st.subheader("Explainability Method")
+#         explain_method = st.radio(
+#             "Select explanation method:",
+#             ["SHAP (Recommended)", "LIME", "Both (Compare)"],
+#             key="explain_method"
+#         )
+#         
+#         analyze_button = st.button("🔍 Analyze Risk", type="primary", use_container_width=True)
+#     
+#     with col2:
+#         if analyze_button:
+#             # Prepare features
+#             features = compute_features_for_prediction({
+#                 'price': price,
+#                 'message_length': message_length,
+#                 'word_count': word_count,
+#                 'gold_merchant': gold_merchant,
+#                 'is_official': is_official
+#             }, 'risk')
+#             
+#             # Get model features
+#             required = risk_model.feature_names
+#             X = pd.DataFrame([{f: features.get(f, 0) for f in required}])
+#             
+#             # Predict
+#             probability = risk_model.predict_proba(X)[0]
+#             
+#             # Determine risk level
+#             if probability < 0.2:
+#                 risk_level = "LOW"
+#                 color = "#10B981"
+#             elif probability < 0.5:
+#                 risk_level = "MEDIUM"
+#                 color = "#F59E0B"
+#             elif probability < 0.8:
+#                 risk_level = "HIGH"
+#                 color = "#EF4444"
+#             else:
+#                 risk_level = "CRITICAL"
+#                 color = "#DC2626"
+#             
+#             st.subheader("Risk Assessment")
+#             
+#             col_a, col_b = st.columns(2)
+#             with col_a:
+#                 st.metric("Risk Probability", f"{probability * 100:.1f}%")
+#             with col_b:
+#                 st.markdown(f"**Risk Level:** <span style='color: {color}; font-size: 1.5rem;'>{risk_level}</span>", unsafe_allow_html=True)
+#             
+#             # Risk gauge
+#             fig = go.Figure(go.Indicator(
+#                 mode="gauge+number",
+#                 value=probability * 100,
+#                 title={'text': "Risk Score"},
+#                 gauge={
+#                     'axis': {'range': [0, 100]},
+#                     'bar': {'color': color},
+#                     'steps': [
+#                         {'range': [0, 20], 'color': "#D1FAE5"},
+#                         {'range': [20, 50], 'color': "#FEF3C7"},
+#                         {'range': [50, 80], 'color': "#FEE2E2"},
+#                         {'range': [80, 100], 'color': "#FECACA"}
+#                     ]
+#                 }
+#             ))
+#             fig.update_layout(height=250)
+#             st.plotly_chart(fig, use_container_width=True)
+#             
+#             # ========== EXPLAINABILITY SECTION ==========
+#             st.divider()
+#             
+#             # Generate background data for explainers
+#             _, reviews = load_sample_data(nrows=200)
+#             if reviews is not None:
+#                 background_data = pd.DataFrame([{f: 0 for f in required}])
+#                 for col in required:
+#                     if col in reviews.columns:
+#                         background_data[col] = reviews[col].median()
+#                 # Expand to 50 samples with some variation
+#                 background_samples = pd.concat([background_data] * 50, ignore_index=True)
+#                 for col in background_samples.columns:
+#                     background_samples[col] = background_samples[col] + np.random.randn(50) * 0.1
+#             else:
+#                 background_samples = X
+#             
+#             # SHAP Explanation
+#             if explain_method in ["SHAP (Recommended)", "Both (Compare)"]:
+#                 st.subheader("🔬 SHAP Explanation")
+#                 st.markdown("*SHAP (SHapley Additive exPlanations) uses game theory to explain predictions.*")
+#                 
+#                 try:
+#                     from src.explainability.shap_explainer import SHAPExplainer
+#                     
+#                     with st.spinner("Computing SHAP values..."):
+#                         shap_explainer = SHAPExplainer(
+#                             model=risk_model,
+#                             background_data=background_samples,
+#                             feature_names=list(X.columns)
+#                         )
+#                         shap_explanation = shap_explainer.explain(X)
+#                         shap_top = shap_explanation.get_top_features(8)
+#                     
+#                     # Create SHAP visualization
+#                     shap_df = pd.DataFrame(shap_top)
+#                     shap_df['abs_value'] = shap_df['shap_value'].abs()
+#                     shap_df = shap_df.sort_values('abs_value', ascending=True)
+#                     
+#                     fig_shap = px.bar(
+#                         shap_df,
+#                         x='shap_value',
+#                         y='feature',
+#                         orientation='h',
+#                         color='direction',
+#                         color_discrete_map={'positive': '#EF4444', 'negative': '#10B981'},
+#                         title="SHAP Feature Contributions"
+#                     )
+#                     fig_shap.update_layout(
+#                         showlegend=True,
+#                         height=300,
+#                         xaxis_title="Impact on Risk (SHAP value)",
+#                         yaxis_title=""
+#                     )
+#                     st.plotly_chart(fig_shap, use_container_width=True)
+#                     
+#                     # Show interpretation
+#                     with st.expander("📖 How to interpret SHAP values"):
+#                         st.markdown("""
+#                         - **Red bars (positive)**: Features pushing prediction **toward higher risk**
+#                         - **Green bars (negative)**: Features pushing prediction **toward lower risk**
+#                         - **Longer bars**: Stronger impact on the prediction
+#                         - SHAP values are mathematically consistent and sum to the difference between prediction and average
+#                         """)
+#                         
+#                 except Exception as e:
+#                     st.warning(f"SHAP explanation unavailable: {e}")
+#             
+#             # LIME Explanation
+#             if explain_method in ["LIME", "Both (Compare)"]:
+#                 st.subheader("🍋 LIME Explanation")
+#                 st.markdown("*LIME (Local Interpretable Model-agnostic Explanations) fits a local linear model.*")
+#                 
+#                 try:
+#                     from src.explainability.lime_explainer import LIMEExplainer
+#                     
+#                     with st.spinner("Computing LIME explanation..."):
+#                         lime_explainer = LIMEExplainer(
+#                             model=risk_model,
+#                             training_data=background_samples,
+#                             feature_names=list(X.columns),
+#                             mode='classification'
+#                         )
+#                         lime_explanation = lime_explainer.explain(X, num_features=8)
+#                         lime_top = lime_explanation.get_top_features(8)
+#                     
+#                     # Create LIME visualization
+#                     lime_df = pd.DataFrame(lime_top)
+#                     lime_df['abs_weight'] = lime_df['lime_weight'].abs()
+#                     lime_df = lime_df.sort_values('abs_weight', ascending=True)
+#                     
+#                     fig_lime = px.bar(
+#                         lime_df,
+#                         x='lime_weight',
+#                         y='feature',
+#                         orientation='h',
+#                         color='direction',
+#                         color_discrete_map={'positive': '#EF4444', 'negative': '#10B981'},
+#                         title="LIME Feature Weights"
+#                     )
+#                     fig_lime.update_layout(
+#                         showlegend=True,
+#                         height=300,
+#                         xaxis_title="Impact on Risk (LIME weight)",
+#                         yaxis_title=""
+#                     )
+#                     st.plotly_chart(fig_lime, use_container_width=True)
+#                     
+#                     # Show local model score
+#                     st.info(f"📊 Local Model R² Score: **{lime_explanation.score:.3f}** (how well the linear model approximates locally)")
+#                     
+#                     with st.expander("📖 How to interpret LIME weights"):
+#                         st.markdown("""
+#                         - **Red bars (positive)**: Features increasing risk probability
+#                         - **Green bars (negative)**: Features decreasing risk probability
+#                         - LIME fits a simple linear model around this specific prediction
+#                         - Higher R² score = better local approximation
+#                         """)
+#                         
+#                 except Exception as e:
+#                     st.warning(f"LIME explanation unavailable: {e}")
+#             
+#             # Comparison section
+#             if explain_method == "Both (Compare)":
+#                 st.divider()
+#                 st.subheader("⚖️ SHAP vs LIME Comparison")
+#                 
+#                 try:
+#                     # Get top features from both
+#                     shap_features = [f['feature'] for f in shap_top[:5]]
+#                     lime_features = [f['feature'] for f in lime_top[:5]]
+#                     
+#                     overlap = set(shap_features) & set(lime_features)
+#                     agreement = len(overlap) / 5 * 100
+#                     
+#                     col_cmp1, col_cmp2, col_cmp3 = st.columns(3)
+#                     with col_cmp1:
+#                         st.metric("Top-5 Feature Overlap", f"{agreement:.0f}%")
+#                     with col_cmp2:
+#                         st.metric("SHAP Top Feature", shap_features[0] if shap_features else "N/A")
+#                     with col_cmp3:
+#                         st.metric("LIME Top Feature", lime_features[0] if lime_features else "N/A")
+#                     
+#                     if agreement >= 60:
+#                         st.success("✅ **High Agreement**: Both methods identify similar important features. Explanations are reliable.")
+#                     elif agreement >= 40:
+#                         st.warning("⚠️ **Moderate Agreement**: Some differences in feature ranking. Consider both perspectives.")
+#                     else:
+#                         st.error("❌ **Low Agreement**: Methods disagree significantly. Further investigation recommended.")
+#                         
+#                 except Exception as e:
+#                     st.warning(f"Could not compare methods: {e}")
+#             
+#             # Global Feature Importance (original)
+#             st.divider()
+#             st.subheader("📊 Global Feature Importance")
+#             st.markdown("*Overall importance of features across all predictions (not specific to this instance).*")
+#             
+#             importance = risk_model.get_feature_importance().head(8)
+#             
+#             fig = px.bar(
+#                 importance,
+#                 x='importance',
+#                 y='feature',
+#                 orientation='h',
+#                 color='importance',
+#                 color_continuous_scale='Reds'
+#             )
+#             fig.update_layout(
+#                 yaxis={'categoryorder': 'total ascending'},
+#                 showlegend=False,
+#                 height=300
+#             )
+#             st.plotly_chart(fig, use_container_width=True)
+# ========== END COMMENTED SECTION ==========
 
 
 def render_recommender():
@@ -510,6 +693,15 @@ def render_recommender():
         
         # Diversify option
         diversify = st.checkbox("Show products from different categories", value=False)
+        
+        # Explainability method selection
+        st.divider()
+        st.subheader("🧠 Explainability Method")
+        explain_method = st.radio(
+            "Choose explanation method:",
+            ["SHAP", "LIME", "Both (Compare)"],
+            help="SHAP: Shapley-based game theory explanations. LIME: Local interpretable model-agnostic explanations."
+        )
         
         recommend_button = st.button("🔍 Get Recommendations", type="primary", use_container_width=True)
         
@@ -572,41 +764,188 @@ def render_recommender():
                     st.markdown("---")
                     st.markdown("### 🧠 Why This Product is Recommended")
                     
-                    # Feature contribution visualization
-                    explanations = rec['explanation']
-                    
-                    if explanations:
-                        # Create bar chart for feature contributions
-                        exp_df = pd.DataFrame(explanations)
+                    # SHAP Explanation
+                    if explain_method in ["SHAP", "Both (Compare)"]:
+                        if explain_method == "Both (Compare)":
+                            st.markdown("#### 🔬 SHAP Explanation")
                         
-                        fig = px.bar(
-                            exp_df,
-                            x='contribution',
-                            y='label',
-                            orientation='h',
-                            color='contribution',
-                            color_continuous_scale='Greens',
-                            text='detail',
-                            labels={'contribution': 'Similarity Contribution', 'label': 'Factor'}
-                        )
-                        fig.update_layout(
-                            yaxis={'categoryorder': 'total ascending'},
-                            showlegend=False,
-                            height=250,
-                            margin=dict(l=0, r=0, t=10, b=0)
-                        )
-                        fig.update_traces(textposition='outside')
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Text explanation
-                        top_reason = explanations[0] if explanations else None
-                        if top_reason:
-                            st.info(
-                                f"**Main Reason:** {top_reason['label']} {top_reason['detail']} "
-                                f"(contributes {top_reason['contribution']*100:.0f}% to similarity)"
+                        try:
+                            import shap
+                            
+                            # Get feature data for SHAP
+                            feature_names = recommender.feature_names
+                            feature_matrix = recommender.feature_matrix
+                            query_idx = recommender.product_ids.index(selected_product_id)
+                            query_features = feature_matrix[query_idx]
+                            
+                            # Create similarity prediction function for SHAP
+                            def similarity_predict_shap(X):
+                                """Predict similarity scores for SHAP."""
+                                similarities = []
+                                for row in X:
+                                    # Cosine similarity
+                                    dot = np.dot(query_features, row)
+                                    norm = np.linalg.norm(query_features) * np.linalg.norm(row)
+                                    sim = dot / norm if norm > 0 else 0
+                                    similarities.append(sim)
+                                return np.array(similarities)
+                            
+                            # Use KernelSHAP with background samples
+                            background_sample = shap.sample(feature_matrix, min(50, len(feature_matrix)))
+                            explainer = shap.KernelExplainer(similarity_predict_shap, background_sample)
+                            
+                            # Get the recommended product's features
+                            rec_idx = recommender.product_ids.index(rec['product_id'])
+                            rec_features = feature_matrix[rec_idx:rec_idx+1]
+                            
+                            # Calculate SHAP values
+                            shap_values = explainer.shap_values(rec_features, nsamples=100)
+                            
+                            # Create SHAP visualization data
+                            shap_data = []
+                            for idx, (fname, sval) in enumerate(zip(feature_names, shap_values[0])):
+                                shap_data.append({
+                                    'feature': fname,
+                                    'shap_value': float(sval),
+                                    'direction': 'positive' if sval > 0 else 'negative'
+                                })
+                            
+                            shap_df = pd.DataFrame(shap_data)
+                            shap_df['abs_value'] = shap_df['shap_value'].abs()
+                            shap_df = shap_df.nlargest(6, 'abs_value').sort_values('abs_value', ascending=True)
+                            
+                            # Feature labels for display
+                            feature_labels = {
+                                'price_normalized': '💰 Price',
+                                'rating_average': '⭐ Rating',
+                                'category_encoded': '📁 Category',
+                                'gold_merchant': '🏅 Merchant',
+                                'is_official': '✅ Official',
+                                'stock_level': '📦 Stock',
+                                'review_count_normalized': '👥 Popularity',
+                                'discount_pct': '🏷️ Discount'
+                            }
+                            shap_df['label'] = shap_df['feature'].map(lambda x: feature_labels.get(x, x))
+                            
+                            fig_shap = px.bar(
+                                shap_df,
+                                x='shap_value',
+                                y='label',
+                                orientation='h',
+                                color='direction',
+                                color_discrete_map={'positive': '#10B981', 'negative': '#EF4444'},
+                                title="" if explain_method == "Both (Compare)" else "SHAP Feature Impact"
                             )
-                    else:
-                        st.markdown("_Explanation not available_")
+                            fig_shap.update_layout(
+                                showlegend=True,
+                                height=250,
+                                xaxis_title="Impact on Similarity (SHAP value)",
+                                yaxis_title="",
+                                margin=dict(l=0, r=0, t=10, b=0)
+                            )
+                            st.plotly_chart(fig_shap, use_container_width=True)
+                            
+                            # Top driver explanation
+                            top_shap = shap_df.iloc[-1]  # Highest absolute value
+                            direction = "increases" if top_shap['shap_value'] > 0 else "decreases"
+                            st.info(f"**Top Driver:** {top_shap['label']} {direction} similarity by {abs(top_shap['shap_value']):.3f}")
+                            
+                        except ImportError:
+                            st.warning("SHAP not installed. Run: `pip install shap`")
+                        except Exception as e:
+                            st.warning(f"SHAP explanation unavailable: {e}")
+                    
+                    # LIME Explanation
+                    if explain_method in ["LIME", "Both (Compare)"]:
+                        if explain_method == "Both (Compare)":
+                            st.markdown("#### 🍋 LIME Explanation")
+                        else:
+                            pass  # Already has header above
+                        
+                        try:
+                            from src.explainability.lime_explainer import LIMEExplainer, LIME_AVAILABLE
+                            
+                            if LIME_AVAILABLE:
+                                # Get feature data for LIME
+                                feature_names = recommender.feature_names
+                                feature_matrix = recommender.feature_matrix
+                                
+                                # Create LIME explainer for similarity prediction
+                                def similarity_predict(X):
+                                    """Predict similarity scores for LIME."""
+                                    query_idx = recommender.product_ids.index(selected_product_id)
+                                    query_features = feature_matrix[query_idx]
+                                    similarities = []
+                                    for row in X:
+                                        # Cosine similarity
+                                        dot = np.dot(query_features, row)
+                                        norm = np.linalg.norm(query_features) * np.linalg.norm(row)
+                                        sim = dot / norm if norm > 0 else 0
+                                        similarities.append([1-sim, sim])  # [dissimilar, similar]
+                                    return np.array(similarities)
+                                
+                                lime_explainer = LIMEExplainer(
+                                    model=None,
+                                    training_data=feature_matrix,
+                                    feature_names=feature_names,
+                                    mode='classification',
+                                    predict_fn=similarity_predict
+                                )
+                                
+                                # Get the recommended product's features
+                                rec_idx = recommender.product_ids.index(rec['product_id'])
+                                rec_features = feature_matrix[rec_idx:rec_idx+1]
+                                
+                                lime_explanation = lime_explainer.explain(rec_features, num_features=6)
+                                lime_top = lime_explanation.get_top_features(6)
+                                
+                                # Create LIME visualization
+                                lime_df = pd.DataFrame(lime_top)
+                                lime_df['abs_weight'] = lime_df['lime_weight'].abs()
+                                lime_df = lime_df.sort_values('abs_weight', ascending=True)
+                                
+                                fig_lime = px.bar(
+                                    lime_df,
+                                    x='lime_weight',
+                                    y='feature',
+                                    orientation='h',
+                                    color='direction',
+                                    color_discrete_map={'positive': '#10B981', 'negative': '#EF4444'},
+                                    title="" if explain_method == "Both (Compare)" else "LIME Feature Weights"
+                                )
+                                fig_lime.update_layout(
+                                    showlegend=True,
+                                    height=250,
+                                    xaxis_title="Impact on Similarity (LIME weight)",
+                                    yaxis_title=""
+                                )
+                                st.plotly_chart(fig_lime, use_container_width=True)
+                                
+                                st.caption(f"LIME Local Model R² Score: {lime_explanation.score:.3f}")
+                            else:
+                                st.warning("LIME not installed. Run: `pip install lime`")
+                        except Exception as e:
+                            st.warning(f"LIME explanation unavailable: {e}")
+                    
+                    # Comparison insight
+                    if explain_method == "Both (Compare)":
+                        with st.expander("📖 Understanding SHAP vs LIME"):
+                            st.markdown("""
+                            **SHAP (SHapley Additive exPlanations):**
+                            - Based on game theory (Shapley values)
+                            - Provides consistent, theoretically grounded feature attributions
+                            - Shows how each feature contributes to the similarity score
+                            - Globally consistent: feature contributions sum to the prediction
+                            
+                            **LIME (Local Interpretable Model-agnostic Explanations):**
+                            - Fits a local linear model around the prediction
+                            - Perturbs input features to understand local behavior
+                            - More intuitive for non-technical users
+                            - May vary slightly between runs due to random perturbations
+                            
+                            **Key Difference:** SHAP provides mathematically guaranteed fair attribution, 
+                            while LIME offers intuitive local approximations. Both are valid XAI methods!
+                            """)
             
             # Summary explanation
             st.divider()
@@ -759,11 +1098,13 @@ def main():
     
     if page == "🏠 Overview":
         render_overview()
-    elif page == "📊 Sales Predictor":
-        render_sales_predictor()
-    elif page == "⚠️ Risk Analyzer":
-        render_risk_analyzer()
-    elif page == "�️ Recommender":
+    # ========== COMMENTED OUT: Sales & Risk pages ==========
+    # elif page == "📊 Sales Predictor":
+    #     render_sales_predictor()
+    # elif page == "⚠️ Risk Analyzer":
+    #     render_risk_analyzer()
+    # ========== END COMMENTED SECTION ==========
+    elif page == "🛍️ Recommender":
         render_recommender()
     elif page == "📈 Analytics":
         render_analytics()
@@ -771,7 +1112,7 @@ def main():
     # Footer
     st.divider()
     st.markdown(
-        '<p style="text-align: center; color: #888;">Built with ❤️ using Streamlit, LightGBM, SHAP & Explainable AI</p>',
+        '<p style="text-align: center; color: #888;">Built with ❤️ using Streamlit, SHAP & Explainable AI</p>',
         unsafe_allow_html=True
     )
 
