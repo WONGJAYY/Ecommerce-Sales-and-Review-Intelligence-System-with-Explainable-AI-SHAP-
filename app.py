@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 # Page config
 st.set_page_config(
-    page_title="Review Intelligence System",
+    page_title="Explainable AI E-Commerce Recommender System",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -81,15 +81,26 @@ st.markdown("""
 # ========== END COMMENTED SECTION ==========
 
 
+def get_available_datasets():
+    """Get list of available CSV datasets in the project."""
+    datasets = {}
+    csv_files = list(Path(".").glob("*.csv"))
+    for f in csv_files:
+        datasets[f.stem] = str(f)
+    return datasets
+
+
 @st.cache_data
-def load_sample_data(nrows=None):
+def load_sample_data(dataset_path=None, nrows=None):
     """Load sample data for visualization."""
+    # Use default dataset path if not provided
+    if dataset_path is None:
+        dataset_path = Path(__file__).parent / 'converted_dataset.csv'
     try:
         from src.data.ingestion import load_tokopedia_data, explode_reviews
         from src.data.preprocessing import DataPreprocessor
         
-        df = load_tokopedia_data("tokopedia_products_with_review.csv", nrows=nrows)
-        # df = load_tokopedia_data("converted_dataset.csv", nrows=nrows)
+        df = load_tokopedia_data(dataset_path, nrows=nrows)
 
         reviews = explode_reviews(df)
         
@@ -103,28 +114,36 @@ def load_sample_data(nrows=None):
 
 
 @st.cache_resource
-def load_recommender():
-    """Load or create the recommender model."""
+def load_recommender(dataset_path=None):
+    """Load or create the recommender model for the selected dataset."""
+    # Use default dataset path if not provided
+    if dataset_path is None:
+        dataset_path = Path(__file__).parent / 'converted_dataset.csv'
     try:
         from src.models.recommender import ExplainableRecommender
         from src.data.ingestion import load_tokopedia_data
         
-        recommender_path = Path("models/recommender/model.pkl")
+        # Create and fit recommender on the fly for the selected dataset
+        df = load_tokopedia_data(dataset_path, nrows=None)
+        recommender = ExplainableRecommender()
+        recommender.fit(df)
         
-        if recommender_path.exists():
-            return ExplainableRecommender.load(recommender_path)
-        else:
-            # Create and fit recommender on the fly
-            df = load_tokopedia_data("converted_dataset.csv", nrows=None)
-            recommender = ExplainableRecommender()
-            recommender.fit(df)
-            
-            # Save for next time
-            recommender.save(recommender_path)
-            return recommender
+        return recommender
             
     except Exception as e:
         st.error(f"Failed to load recommender: {e}")
+        return None
+
+
+@st.cache_resource
+def load_llm_client():
+    """Load NVIDIA NIM LLM client for natural language explanations."""
+    try:
+        from src.llm.nvidia_nim import NVIDIANimClient
+        client = NVIDIANimClient()
+        return client
+    except Exception as e:
+        st.warning(f"LLM client not available: {e}")
         return None
 
 
@@ -186,8 +205,7 @@ def render_sidebar():
         
         page = st.radio(
             "Select Page",
-            ["🏠 Overview", "🛍️ Recommender", "📈 Analytics"],
-            # Commented out: "📊 Sales Predictor", "⚠️ Risk Analyzer"
+            ["🏠 Overview", "🛍️ Recommender", "� AI Chat", "📈 Analytics"],
             label_visibility="collapsed"
         )
         
@@ -195,7 +213,7 @@ def render_sidebar():
         
         st.markdown("### About")
         st.info(
-            "This system uses **Content-Based Filtering** with **SHAP** explainability "
+            "This system uses **Content-Based Filtering** with **SHAP & LLM** explainability "
             "to recommend products and explain WHY each product is suggested."
         )
         
@@ -214,7 +232,7 @@ def render_overview():
     st.header("System Overview")
     
     # Load actual data count
-    df, reviews = load_sample_data(nrows=None)
+    df, reviews = load_sample_data("converted_dataset.csv", nrows=None)
     product_count = len(df) if df is not None else 0
     review_count = len(reviews) if reviews is not None else 0
     
@@ -239,7 +257,7 @@ def render_overview():
     with col3:
         st.markdown("""
         <div class="metric-card">
-            <h2>SHAP & LIME</h2>
+            <h2>SHAP, LIME & LLM</h2>
             <p>Explainability</p>
         </div>
         """, unsafe_allow_html=True)
@@ -266,7 +284,8 @@ def render_overview():
         | **Data** | Ingestion, Validation, Preprocessing |
         | **Features** | Feature Engineering, Feature Store |
         | **Models** | Content-Based Filtering Recommender |
-        | **Explainability** | SHAP (Shapley Values), LIME (Local Explanations) |
+        | **Explainability** | SHAP, LIME, LLM (Natural Language) |
+        | **LLM** | NVIDIA NIM (Llama 3.3), Chat, Review Summary |
         | **Serving** | FastAPI, Streamlit Dashboard |
         """)
     
@@ -274,8 +293,9 @@ def render_overview():
         st.markdown("### Tech Stack")
         st.markdown("""
         - 🐍 Python 3.10+
-        - 📊 SHAP (SHapley Additive exPlanations)
-        - 🍋 LIME (Local Interpretable Model-agnostic Explanations)
+        - 🦙 NVIDIA NIM (Llama 3.3 70B)
+        - 📊 SHAP (Shapley Additive exPlanations)
+        - 🍋 LIME (Local Interpretable Explanations)
         - 🛍️ Content-Based Filtering
         - 📈 Scikit-learn
         - ⚡ FastAPI
@@ -674,8 +694,8 @@ def render_recommender():
         
         # Product selector
         product_options = {
-            f"{row['name'][:50]}... (RM {row['price_raw']:.0f})": row['product_id']
-            for _, row in filtered_products.head(100).iterrows()
+            f"{row['name'][:50]}... (${row['price_raw']:.0f})": row['product_id']
+            for _, row in filtered_products.iterrows()
         }
         
         if not product_options:
@@ -699,8 +719,8 @@ def render_recommender():
         st.subheader("🧠 Explainability Method")
         explain_method = st.radio(
             "Choose explanation method:",
-            ["SHAP", "LIME", "Both (Compare)"],
-            help="SHAP: Shapley-based game theory explanations. LIME: Local interpretable model-agnostic explanations."
+            ["SHAP", "LIME", "LLM (Natural Language)", "All Methods"],
+            help="SHAP: Game theory explanations. LIME: Local linear explanations. LLM: AI-powered natural language explanations."
         )
         
         recommend_button = st.button("🔍 Get Recommendations", type="primary", use_container_width=True)
@@ -712,7 +732,7 @@ def render_recommender():
         
         st.markdown(f"**{selected_product['name'][:60]}...**")
         st.markdown(f"📁 Category: {selected_product['category']}")
-        st.markdown(f"💰 Price: RM {selected_product['price_raw']:,.2f}")
+        st.markdown(f"💰 Price: ${selected_product['price_raw']:,.2f}")
         st.markdown(f"⭐ Rating: {selected_product['rating_average']:.1f}/5.0")
         st.markdown(f"📦 Sold: {selected_product['count_sold']:,} units")
         
@@ -744,7 +764,7 @@ def render_recommender():
                     # Product details
                     col_a, col_b, col_c = st.columns(3)
                     with col_a:
-                        st.metric("Price", f"RM {rec['price']:,.2f}")
+                        st.metric("Price", f"${rec['price']:,.2f}")
                     with col_b:
                         st.metric("Rating", f"{rec['rating']:.1f} ⭐")
                     with col_c:
@@ -764,9 +784,64 @@ def render_recommender():
                     st.markdown("---")
                     st.markdown("### 🧠 Why This Product is Recommended")
                     
+                    # LLM Natural Language Explanation
+                    if explain_method in ["LLM (Natural Language)", "All Methods"]:
+                        if explain_method == "All Methods":
+                            st.markdown("#### 🤖 AI Natural Language Explanation")
+                        
+                        llm_client = load_llm_client()
+                        if llm_client and llm_client.is_available:
+                            with st.spinner("Generating AI explanation..."):
+                                # Get SHAP values first for context
+                                shap_values_dict = rec.get('feature_contributions', {})
+                                
+                                source_product_info = {
+                                    'name': selected_product['name'],
+                                    'category': selected_product['category'],
+                                    'price': selected_product['price_raw'],
+                                    'rating_average': selected_product['rating_average']
+                                }
+                                
+                                rec_product_info = {
+                                    'name': rec['name'],
+                                    'category': rec['category'],
+                                    'price': rec['price'],
+                                    'rating_average': rec['rating']
+                                }
+                                
+                                llm_explanation = llm_client.explain_recommendation(
+                                    source_product=source_product_info,
+                                    recommended_product=rec_product_info,
+                                    shap_values=shap_values_dict,
+                                    similarity_score=rec['similarity_score']
+                                )
+                                
+                                st.success(f"💬 {llm_explanation}")
+                        else:
+                            st.info("💡 **Set up LLM for natural language explanations:**\n\n"
+                                   "1. Get API key from [build.nvidia.com](https://build.nvidia.com)\n"
+                                   "2. Set environment variable: `NVIDIA_API_KEY=your_key_here`\n"
+                                   "3. Restart the app")
+                            
+                            # Show fallback explanation
+                            top_features = sorted(rec['feature_contributions'].items(), 
+                                                 key=lambda x: abs(x[1]), reverse=True)[:3]
+                            feature_names = {
+                                'price_normalized': 'similar price',
+                                'rating_average': 'similar rating',
+                                'category_encoded': 'same category',
+                                'gold_merchant': 'trusted seller',
+                                'is_official': 'official store',
+                                'stock_level': 'availability',
+                                'review_count_normalized': 'popularity',
+                                'discount_pct': 'discount'
+                            }
+                            reasons = [feature_names.get(f, f) for f, _ in top_features]
+                            st.write(f"**Fallback:** Recommended due to {', '.join(reasons)}.")
+                    
                     # SHAP Explanation
-                    if explain_method in ["SHAP", "Both (Compare)"]:
-                        if explain_method == "Both (Compare)":
+                    if explain_method in ["SHAP", "All Methods"]:
+                        if explain_method == "All Methods":
                             st.markdown("#### 🔬 SHAP Explanation")
                         
                         try:
@@ -834,7 +909,7 @@ def render_recommender():
                                 orientation='h',
                                 color='direction',
                                 color_discrete_map={'positive': '#10B981', 'negative': '#EF4444'},
-                                title="" if explain_method == "Both (Compare)" else "SHAP Feature Impact"
+                                title="" if explain_method == "All Methods" else "SHAP Feature Impact"
                             )
                             fig_shap.update_layout(
                                 showlegend=True,
@@ -856,11 +931,9 @@ def render_recommender():
                             st.warning(f"SHAP explanation unavailable: {e}")
                     
                     # LIME Explanation
-                    if explain_method in ["LIME", "Both (Compare)"]:
-                        if explain_method == "Both (Compare)":
+                    if explain_method in ["LIME", "All Methods"]:
+                        if explain_method == "All Methods":
                             st.markdown("#### 🍋 LIME Explanation")
-                        else:
-                            pass  # Already has header above
                         
                         try:
                             from src.explainability.lime_explainer import LIMEExplainer, LIME_AVAILABLE
@@ -911,7 +984,7 @@ def render_recommender():
                                     orientation='h',
                                     color='direction',
                                     color_discrete_map={'positive': '#10B981', 'negative': '#EF4444'},
-                                    title="" if explain_method == "Both (Compare)" else "LIME Feature Weights"
+                                    title="" if explain_method == "All Methods" else "LIME Feature Weights"
                                 )
                                 fig_lime.update_layout(
                                     showlegend=True,
@@ -928,23 +1001,26 @@ def render_recommender():
                             st.warning(f"LIME explanation unavailable: {e}")
                     
                     # Comparison insight
-                    if explain_method == "Both (Compare)":
-                        with st.expander("📖 Understanding SHAP vs LIME"):
+                    if explain_method == "All Methods":
+                        with st.expander("📖 Understanding the Explanation Methods"):
                             st.markdown("""
-                            **SHAP (SHapley Additive exPlanations):**
-                            - Based on game theory (Shapley values)
-                            - Provides consistent, theoretically grounded feature attributions
-                            - Shows how each feature contributes to the similarity score
-                            - Globally consistent: feature contributions sum to the prediction
+                            **🤖 LLM (Large Language Model):**
+                            - Uses NVIDIA NIM AI to generate human-readable explanations
+                            - Combines SHAP values with product context
+                            - Most intuitive for end users
                             
-                            **LIME (Local Interpretable Model-agnostic Explanations):**
+                            **🔬 SHAP (SHapley Additive exPlanations):**
+                            - Based on game theory (Shapley values)
+                            - Provides mathematically consistent feature attributions
+                            - Shows how each feature contributes to similarity
+                            
+                            **🍋 LIME (Local Interpretable Model-agnostic Explanations):**
                             - Fits a local linear model around the prediction
                             - Perturbs input features to understand local behavior
-                            - More intuitive for non-technical users
-                            - May vary slightly between runs due to random perturbations
+                            - Simple and intuitive visualizations
                             
-                            **Key Difference:** SHAP provides mathematically guaranteed fair attribution, 
-                            while LIME offers intuitive local approximations. Both are valid XAI methods!
+                            **Best Practice:** Use LLM for user-facing explanations, 
+                            SHAP for technical analysis, and LIME for quick insights!
                             """)
             
             # Summary explanation
@@ -1024,6 +1100,232 @@ def render_recommender():
                     st.divider()
 
 
+def render_ai_chat():
+    """Render AI Chat page with product chat and review summarization."""
+    st.header("💬 AI Chat Assistant")
+    st.markdown("Ask questions about products or get AI-powered review summaries.")
+    
+    # Load data and LLM client
+    llm_client = load_llm_client()
+    recommender = load_recommender()
+    products, reviews = load_sample_data(nrows=5000)
+    
+    if recommender is None or recommender.products_df is None:
+        st.error("Recommender not loaded. Please check your data.")
+        return
+    
+    # Check LLM availability
+    if llm_client is None or not llm_client.is_available:
+        st.warning("""
+        ⚠️ **LLM not configured.** To enable AI Chat:
+        1. Get API key from [build.nvidia.com](https://build.nvidia.com)
+        2. Add to `.env` file: `NVIDIA_API_KEY=your_key_here`
+        3. Restart the app
+        """)
+    
+    # Create two tabs
+    tab1, tab2 = st.tabs(["🤖 Product Chat", "📝 Review Summarizer"])
+    
+    # ===================== TAB 1: Product Chat =====================
+    with tab1:
+        st.subheader("Chat About Products")
+        st.markdown("Select a product and ask questions about it!")
+        
+        products_df = recommender.products_df
+        
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            # Product selection
+            product_options = {
+                f"{row['name'][:50]}..." if len(row['name']) > 50 else row['name']: row['product_id']
+                for _, row in products_df.iterrows()
+            }
+            
+            selected_name = st.selectbox(
+                "Select a Product:",
+                options=list(product_options.keys()),
+                key="chat_product"
+            )
+            selected_id = product_options[selected_name]
+            selected_product = products_df[products_df['product_id'] == selected_id].iloc[0]
+            
+            # Show product info
+            st.markdown("---")
+            st.markdown(f"**{selected_product['name'][:60]}...**")
+            st.markdown(f"📁 Category: {selected_product['category']}")
+            st.markdown(f"💰 Price: RM {selected_product['price_raw']:,.2f}")
+            st.markdown(f"⭐ Rating: {selected_product['rating_average']:.1f}/5.0")
+            st.markdown(f"📦 Sold: {selected_product['count_sold']:,} units")
+            
+            # Get recommendations for context
+            recommendations = recommender.recommend(product_id=selected_id, n_recommendations=3)
+        
+        with col2:
+            # Initialize chat history
+            if "chat_messages" not in st.session_state:
+                st.session_state.chat_messages = []
+            
+            # Chat container
+            chat_container = st.container(height=400)
+            
+            with chat_container:
+                # Display chat history
+                for msg in st.session_state.chat_messages:
+                    if msg["role"] == "user":
+                        st.markdown(f"**🧑 You:** {msg['content']}")
+                    else:
+                        st.markdown(f"**🤖 AI:** {msg['content']}")
+                    st.markdown("")
+            
+            # Chat input
+            user_question = st.text_input(
+                "Ask a question about this product:",
+                placeholder="e.g., Is this good for beginners? What are similar alternatives?",
+                key="chat_input"
+            )
+            
+            col_send, col_clear = st.columns([1, 1])
+            with col_send:
+                send_button = st.button("📤 Send", type="primary", use_container_width=True)
+            with col_clear:
+                if st.button("🗑️ Clear Chat", use_container_width=True):
+                    st.session_state.chat_messages = []
+                    st.rerun()
+            
+            if send_button and user_question:
+                if llm_client and llm_client.is_available:
+                    # Add user message
+                    st.session_state.chat_messages.append({
+                        "role": "user",
+                        "content": user_question
+                    })
+                    
+                    # Get AI response
+                    with st.spinner("Thinking..."):
+                        product_info = {
+                            'name': selected_product['name'],
+                            'category': selected_product['category'],
+                            'price': selected_product['price_raw'],
+                            'rating_average': selected_product['rating_average'],
+                            'stock': selected_product.get('stock_level', 'Unknown'),
+                            'count_sold': selected_product['count_sold']
+                        }
+                        
+                        # Convert recommendations to dict format
+                        recs_for_chat = [
+                            {'name': r['name'], 'price': r['price'], 'category': r['category']}
+                            for r in recommendations
+                        ]
+                        
+                        # Get conversation history for context
+                        conv_history = [
+                            {"role": m["role"], "content": m["content"]}
+                            for m in st.session_state.chat_messages[-6:]
+                        ]
+                        
+                        response = llm_client.chat_about_product(
+                            question=user_question,
+                            product_info=product_info,
+                            recommendations=recs_for_chat,
+                            conversation_history=conv_history[:-1]  # Exclude current question
+                        )
+                    
+                    # Add AI response
+                    st.session_state.chat_messages.append({
+                        "role": "assistant",
+                        "content": response
+                    })
+                    
+                    st.rerun()
+                else:
+                    st.error("LLM not available. Please configure your NVIDIA API key.")
+            
+            # Example questions
+            with st.expander("💡 Example Questions"):
+                st.markdown("""
+                - Is this product worth the price?
+                - What are the pros and cons?
+                - Who would this be best for?
+                - How does it compare to alternatives?
+                - Is this suitable for professional use?
+                """)
+    
+    # ===================== TAB 2: Review Summarizer =====================
+    with tab2:
+        st.subheader("AI Review Summarizer")
+        st.markdown("Get an AI-powered summary of product reviews.")
+        
+        products_df = recommender.products_df
+        
+        # Product selection
+        product_options = {
+            f"{row['name'][:50]}..." if len(row['name']) > 50 else row['name']: row['product_id']
+            for _, row in products_df.iterrows()
+        }
+        
+        selected_name = st.selectbox(
+            "Select a Product to Summarize Reviews:",
+            options=list(product_options.keys()),
+            key="summary_product"
+        )
+        selected_id = product_options[selected_name]
+        selected_product = products_df[products_df['product_id'] == selected_id].iloc[0]
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.markdown(f"**Selected:** {selected_product['name'][:60]}...")
+            st.markdown(f"⭐ Rating: {selected_product['rating_average']:.1f}/5.0")
+        
+        with col2:
+            summarize_button = st.button("🔍 Summarize Reviews", type="primary", use_container_width=True)
+        
+        if summarize_button:
+            if llm_client and llm_client.is_available:
+                with st.spinner("Analyzing reviews with AI..."):
+                    # Get reviews for this product
+                    if reviews is not None and 'product_id' in reviews.columns:
+                        product_reviews = reviews[reviews['product_id'] == selected_id]
+                        
+                        if len(product_reviews) > 0 and 'message' in product_reviews.columns:
+                            review_texts = product_reviews['message'].dropna().tolist()[:15]
+                            
+                            if review_texts:
+                                summary = llm_client.summarize_reviews(
+                                    reviews=review_texts,
+                                    product_name=selected_product['name'][:50]
+                                )
+                                
+                                st.success("✅ Summary Generated!")
+                                st.markdown("### 📊 AI Review Summary")
+                                st.markdown(summary)
+                                
+                                # Show sample reviews
+                                with st.expander(f"📝 View {min(5, len(review_texts))} Sample Reviews"):
+                                    for i, review in enumerate(review_texts[:5], 1):
+                                        st.markdown(f"**Review {i}:** {review[:200]}...")
+                                        st.markdown("---")
+                            else:
+                                st.warning("No review text found for this product.")
+                        else:
+                            st.warning("No reviews found for this product.")
+                    else:
+                        st.warning("Reviews data not available.")
+            else:
+                st.error("LLM not available. Please configure your NVIDIA API key.")
+        
+        # Info about review summarization
+        st.markdown("---")
+        st.info("""
+        **How it works:**
+        1. The AI reads up to 15 reviews for the selected product
+        2. It analyzes the overall sentiment (positive/negative/mixed)
+        3. It identifies key pros and cons mentioned by customers
+        4. It generates a concise summary to help you make a decision
+        """)
+
+
 def render_analytics():
     """Render analytics page."""
     st.header("📈 Data Analytics")
@@ -1086,7 +1388,7 @@ def render_analytics():
         color='rating_average',
         size='stock' if 'stock' in sample.columns else None,
         color_continuous_scale='Viridis',
-        labels={'price': 'Price (IDR)', 'count_sold': 'Units Sold', 'rating_average': 'Rating'}
+        labels={'price': 'Price (USD)', 'count_sold': 'Units Sold', 'rating_average': 'Rating'}
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -1106,13 +1408,15 @@ def main():
     # ========== END COMMENTED SECTION ==========
     elif page == "🛍️ Recommender":
         render_recommender()
+    elif page == "� AI Chat":
+        render_ai_chat()
     elif page == "📈 Analytics":
         render_analytics()
     
     # Footer
     st.divider()
     st.markdown(
-        '<p style="text-align: center; color: #888;">Built with ❤️ using Streamlit, SHAP & Explainable AI</p>',
+        '<p style="text-align: center; color: #888;">Built with ❤️ using Streamlit, SHAP, LLM & Explainable AI</p>',
         unsafe_allow_html=True
     )
 

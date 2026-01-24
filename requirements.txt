@@ -12,6 +12,9 @@ catboost>=1.2.0
 shap>=0.43.0
 lime>=0.2.0
 
+# LLM Integration (NVIDIA NIM)
+openai>=1.0.0
+
 # Deep Learning (optional)
 # torch>=2.0.0
 # transformers>=4.30.0
